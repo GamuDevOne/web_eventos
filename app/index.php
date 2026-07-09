@@ -1,5 +1,6 @@
 <?php
-header("Content-Type: application/json");  //router simple
+session_start();
+header("Content-Type: application/json");
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/controllers/EventoController.php';
 
@@ -21,6 +22,12 @@ switch ("$method:$action") {
         break;
     case "GET:listar":
         $controller->listar();
+        break;
+    case "POST:asistencia":
+        $controller->asistencia();
+        break;
+    case "POST:acreditacion":
+        $controller->acreditacion();
         break;
     default:
         http_response_code(404);
