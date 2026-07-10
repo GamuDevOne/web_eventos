@@ -1,5 +1,8 @@
 <?php
-session_start();
+declare(strict_types=1);
+
+require_once __DIR__ . '/../config/session.php';
+
 header("Content-Type: application/json");
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/controllers/EventoController.php';
