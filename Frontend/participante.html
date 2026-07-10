@@ -1,0 +1,166 @@
+<!-- =========================================================================
+     participante.html
+     Pertenece a: Integrante 3 - Frontend
+     Proyecto: Plataforma de Gestión de Eventos y Acreditaciones (Grupo 6)
+
+     Vista exclusiva para usuarios con rol "participante": ver eventos
+     disponibles, inscribirse, y ver sus inscripciones (guardadas en el
+     navegador porque el backend aún no tiene endpoint para listarlas
+     por usuario — ver TODO backend en api.js).
+     ========================================================================= -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mis eventos · Gestión de Eventos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-inner">
+    <div class="brand"><span class="brand-mark">GE</span> Gestión de Eventos</div>
+    <div class="nav-links">
+      <a href="participante.html" class="active">Eventos disponibles</a>
+    </div>
+    <div class="nav-user">
+      <span id="nombreUsuario">—</span>
+      <button class="btn-logout" onclick="Sesion.cerrar()">Salir</button>
+    </div>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="eyebrow">Participante</div>
+      <h1>Eventos disponibles</h1>
+      <p>Inscríbete a los eventos que te interesen y revisa tu cupo.</p>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Listado de eventos con opción de inscribirse -->
+    <div class="card">
+      <div class="card-title">
+        <h3>Próximos eventos</h3>
+        <button class="btn btn-outline btn-sm" onclick="cargarEventos()">Actualizar</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Evento</th><th>Fecha</th><th>Cupo</th><th></th></tr>
+        </thead>
+        <tbody id="tablaEventos">
+          <tr><td colspan="4" class="empty-state">Cargando eventos…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mis inscripciones (registro local, ver nota TODO backend) -->
+    <div class="card card-credential">
+      <div class="card-title"><h3>Mis inscripciones</h3></div>
+      <p class="hint">
+        Este listado se guarda en tu navegador mientras el backend no tenga
+        un endpoint para consultar tus inscripciones por usuario.
+      </p>
+      <div id="listaMisInscripciones"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  const usuarioActual = Sesion.requerirParticipante();
+  pintarUsuarioNavbar();
+
+  const tablaEventos = document.getElementById("tablaEventos");
+  const listaMisInscripciones = document.getElementById("listaMisInscripciones");
+  const CLAVE_LOCAL = `mis_inscripciones_${usuarioActual ? usuarioActual.id : "anon"}`;
+
+  function claseCupo(porcentaje) {
+    if (porcentaje >= 100) return "lleno";
+    if (porcentaje >= 75) return "alto";
+    return "";
+  }
+
+  async function cargarEventos() {
+    tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">Cargando eventos…</td></tr>`;
+    try {
+      const eventos = await EventosAPI.listar();
+      if (!eventos || eventos.length === 0) {
+        tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">No hay eventos disponibles todavía.</td></tr>`;
+        return;
+      }
+
+      tablaEventos.innerHTML = eventos.map((ev) => {
+        const porcentaje = ev.cupo_total > 0 ? Math.round((ev.cupo_ocupado / ev.cupo_total) * 100) : 0;
+        const lleno = porcentaje >= 100;
+        const fecha = ev.fecha ? new Date(ev.fecha.replace(" ", "T")).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }) : "—";
+        return `
+          <tr>
+            <td style="font-weight:600;">${escaparHTML(ev.nombre)}</td>
+            <td>${fecha}</td>
+            <td style="min-width:120px;">
+              <div class="cupo-bar"><div class="cupo-bar-fill ${claseCupo(porcentaje)}" style="width:${Math.min(porcentaje,100)}%"></div></div>
+              <div class="hint">${ev.cupo_ocupado}/${ev.cupo_total}</div>
+            </td>
+            <td>
+              <button class="btn btn-primary btn-sm" ${lleno ? "disabled" : ""} onclick="inscribirme(${ev.id}, '${escaparHTML(ev.nombre)}')">
+                ${lleno ? "Cupo lleno" : "Inscribirme"}
+              </button>
+            </td>
+          </tr>`;
+      }).join("");
+    } catch (err) {
+      tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">${err.message}</td></tr>`;
+    }
+  }
+
+  async function inscribirme(evento_id, nombreEvento) {
+    try {
+      const resultado = await EventosAPI.inscribir(evento_id, usuarioActual.id);
+      if (resultado.status === "success") {
+        mostrarToast(resultado.mensaje, "success");
+        guardarInscripcionLocal(nombreEvento);
+        cargarEventos();
+      } else {
+        mostrarToast(resultado.mensaje || "No se pudo completar la inscripción", "error");
+      }
+    } catch (err) {
+      mostrarToast(err.message, "error");
+    }
+  }
+
+  function guardarInscripcionLocal(nombreEvento) {
+    const registro = JSON.parse(localStorage.getItem(CLAVE_LOCAL) || "[]");
+    registro.push({ evento: nombreEvento, fecha: new Date().toLocaleString("es-ES") });
+    localStorage.setItem(CLAVE_LOCAL, JSON.stringify(registro));
+    pintarMisInscripciones();
+  }
+
+  function pintarMisInscripciones() {
+    const registro = JSON.parse(localStorage.getItem(CLAVE_LOCAL) || "[]");
+    if (registro.length === 0) {
+      listaMisInscripciones.innerHTML = `<div class="empty-state">Aún no te has inscrito a ningún evento.</div>`;
+      return;
+    }
+    listaMisInscripciones.innerHTML = registro.map((r) => `
+      <div style="padding:10px 0; border-bottom:1px solid var(--color-border);">
+        <div style="font-weight:600;">${escaparHTML(r.evento)}</div>
+        <div class="hint">Inscrito el ${r.fecha}</div>
+      </div>
+    `).join("");
+  }
+
+  function escaparHTML(texto) {
+    const div = document.createElement("div");
+    div.textContent = texto ?? "";
+    return div.innerHTML;
+  }
+
+  cargarEventos();
+  pintarMisInscripciones();
+</script>
+</body>
+</html>

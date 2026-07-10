@@ -1,0 +1,231 @@
+<!-- =========================================================================
+    
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Iniciar sesión · Gestión de Eventos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="brand-mark">GE</span>
+      <div>
+        <div style="font-family:var(--font-display); font-weight:700; font-size:18px;">Gestión de Eventos</div>
+        <div class="hint">Congresos, seminarios y talleres</div>
+      </div>
+    </div>
+
+    <h2 class="mt-0">Iniciar sesión</h2>
+    <p style="margin-bottom:22px;">Ingresa con tu cuenta de organizador o participante.</p>
+
+    <div class="form-error" id="errorLogin"></div>
+
+    <form id="formLogin">
+      <div class="field">
+        <label for="email">Correo electrónico</label>
+        <input type="email" id="email" name="email" placeholder="tucorreo@email.com" required>
+      </div>
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="btnLogin">Ingresar</button>
+    </form>
+
+    <div class="auth-footer">
+      ¿No tienes cuenta? <a href="registro.html">Crear una cuenta</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  // Si ya hay sesión guardada, saltar directo al dashboard.
+  if (Sesion.obtener()) {
+    window.location.href = "dashboard.html";
+  }
+
+  const formLogin = document.getElementById("formLogin");
+  const errorBox = document.getElementById("errorLogin");
+  const btnLogin = document.getElementById("btnLogin");
+
+  formLogin.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    errorBox.classList.remove("visible");
+    btnLogin.disabled = true;
+    btnLogin.textContent = "Ingresando…";
+
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+
+    try {
+      // Conecta con UsuariosAPI.login (ver TODO backend en api.js).
+      const resultado = await UsuariosAPI.login(email, password);
+      if (resultado && resultado.status === "ok") {
+        Sesion.guardar(resultado.usuario);
+        window.location.href = "dashboard.html";
+      } else {
+        throw new Error((resultado && resultado.mensaje) || "Credenciales inválidas");
+      }
+    } catch (err) {
+      errorBox.textContent = err.message || "No se pudo iniciar sesión. Intenta de nuevo.";
+      errorBox.classList.add("visible");
+    } finally {
+      btnLogin.disabled = false;
+      btnLogin.textContent = "Ingresar";
+    }
+  });
+</script>
+</body>
+</html>  
+
+ ========================================================================= -->
+
+ <!-- =========================================================================
+     login.html
+     Pertenece a: Integrante 3 - Frontend
+     Proyecto: Plataforma de Gestión de Eventos y Acreditaciones (Grupo 6)
+
+     NOTA TEMPORAL: mientras el backend de autenticación (UsuariosAPI.login)
+     no exista, este login valida contra una lista local de usuarios de
+     prueba (los mismos del INSERT de sql/database.sql). Cuando Integrante 2
+     publique el endpoint real, solo hay que reemplazar la función
+     validarLocal() por la llamada a UsuariosAPI.login().
+     ========================================================================= -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Iniciar sesión · Gestión de Eventos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="brand-mark">GE</span>
+      <div>
+        <div style="font-family:var(--font-display); font-weight:700; font-size:18px;">Gestión de Eventos</div>
+        <div class="hint">Congresos, seminarios y talleres</div>
+      </div>
+    </div>
+
+    <h2 class="mt-0">Iniciar sesión</h2>
+    <p style="margin-bottom:22px;">Ingresa con tu cuenta de organizador o participante.</p>
+
+    <div class="form-error" id="errorLogin"></div>
+
+    <form id="formLogin">
+      <div class="field">
+        <label for="email">Correo electrónico</label>
+        <input type="email" id="email" name="email" placeholder="tucorreo@email.com" required>
+      </div>
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="btnLogin">Ingresar</button>
+    </form>
+
+    <div class="card" style="margin-top:18px; background:var(--color-surface-alt); box-shadow:none; padding:14px 16px;">
+      <div class="hint" style="margin-bottom:6px;"><strong>Usuarios de prueba</strong> (mientras no hay backend de login):</div>
+      <div class="hint">org@eventos.com / admin123 (organizador)</div>
+      <div class="hint">ana@email.com / ana123 (participante)</div>
+      <div class="hint">carlos@email.com / carlos123 (participante)</div>
+    </div>
+
+    <div class="auth-footer">
+      ¿No tienes cuenta? <a href="registro.html">Crear una cuenta</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  // Si ya hay sesión guardada, saltar directo al dashboard.
+const sesionExistente = Sesion.obtener();
+  if (sesionExistente) {
+    window.location.href = sesionExistente.rol === "organizador" ? "dashboard.html" : "participante.html";
+  }
+
+  // -----------------------------------------------------------------------
+  // Usuarios de prueba (copia exacta del INSERT de sql/database.sql).
+  // TODO backend: eliminar este arreglo apenas exista UsuariosAPI.login real
+  // con verificación de contraseña en el servidor.
+  // -----------------------------------------------------------------------
+  const USUARIOS_DEMO = [
+    { id: 1, nombre: "Organizador Principal", email: "org@eventos.com",    password: "admin123",  rol: "organizador"  },
+    { id: 2, nombre: "Ana Pérez",             email: "ana@email.com",      password: "ana123",    rol: "participante" },
+    { id: 3, nombre: "Carlos Gómez",          email: "carlos@email.com",   password: "carlos123", rol: "participante" },
+    { id: 4, nombre: "María López",           email: "maria@email.com",    password: "maria123",  rol: "participante" },
+    { id: 5, nombre: "Luis Fernández",        email: "luis@email.com",     password: "luis123",   rol: "participante" },
+  ];
+
+  function validarLocal(email, password) {
+    const usuario = USUARIOS_DEMO.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
+    );
+    if (!usuario) return null;
+    const { password: _omitida, ...usuarioSinPassword } = usuario;
+    return usuarioSinPassword;
+  }
+
+  const formLogin = document.getElementById("formLogin");
+  const errorBox = document.getElementById("errorLogin");
+  const btnLogin = document.getElementById("btnLogin");
+
+  formLogin.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    errorBox.classList.remove("visible");
+    btnLogin.disabled = true;
+    btnLogin.textContent = "Ingresando…";
+
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+
+    // Simula la latencia de una llamada real para que se sienta natural.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const usuario = validarLocal(email, password);
+
+if (usuario) {
+      Sesion.guardar(usuario);
+      window.location.href = usuario.rol === "organizador" ? "dashboard.html" : "participante.html";
+    } else {
+      errorBox.textContent = "Correo o contraseña incorrectos.";
+      errorBox.classList.add("visible");
+      btnLogin.disabled = false;
+      btnLogin.textContent = "Ingresar";
+    }
+
+    /* ---------------------------------------------------------------------
+       CUANDO EXISTA EL BACKEND: borra el bloque de arriba desde
+       "const usuario = validarLocal(...)" y usa esto en su lugar:
+
+       try {
+         const resultado = await UsuariosAPI.login(email, password);
+         if (resultado && resultado.status === "ok") {
+           Sesion.guardar(resultado.usuario);
+           window.location.href = "dashboard.html";
+         } else {
+           throw new Error((resultado && resultado.mensaje) || "Credenciales inválidas");
+         }
+       } catch (err) {
+         errorBox.textContent = err.message;
+         errorBox.classList.add("visible");
+       } finally {
+         btnLogin.disabled = false;
+         btnLogin.textContent = "Ingresar";
+       }
+    --------------------------------------------------------------------- */
+  });
+</script>
+</body>
+</html>

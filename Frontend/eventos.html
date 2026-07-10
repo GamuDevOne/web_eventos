@@ -1,0 +1,184 @@
+<!-- =========================================================================
+     eventos.html
+     Pertenece a: Integrante 3 - Frontend
+     Proyecto: Plataforma de Gestión de Eventos y Acreditaciones (Grupo 6)
+     ========================================================================= -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Eventos · Gestión de Eventos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-inner">
+    <div class="brand"><span class="brand-mark">GE</span> Gestión de Eventos</div>
+    <div class="nav-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="eventos.html" class="active">Eventos</a>
+      <a href="conferencistas.html">Conferencistas</a>
+      <a href="inscripcion.html">Inscripciones</a>
+    </div>
+    <div class="nav-user">
+      <span id="nombreUsuario">—</span>
+      <button class="btn-logout" onclick="Sesion.cerrar()">Salir</button>
+    </div>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="eyebrow">Organización</div>
+      <h1>Eventos</h1>
+      <p>Crea congresos, seminarios o talleres y controla su cupo disponible.</p>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Formulario: crear evento -->
+    <div class="card">
+      <div class="card-title"><h3>Nuevo evento</h3></div>
+      <div class="form-error" id="errorEvento"></div>
+      <form id="formEvento">
+        <div class="field">
+          <label for="nombre">Nombre del evento</label>
+          <input type="text" id="nombre" placeholder="Congreso de Tecnología 2026" required>
+        </div>
+        <div class="field">
+          <label for="descripcion">Descripción</label>
+          <textarea id="descripcion" placeholder="Breve descripción del evento"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="cupo_total">Cupo total</label>
+            <input type="number" id="cupo_total" min="1" placeholder="50" required>
+          </div>
+          <div class="field">
+            <label for="fecha">Fecha y hora</label>
+            <input type="datetime-local" id="fecha" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnCrearEvento">Crear evento</button>
+      </form>
+    </div>
+
+    <!-- Tabla: listado de eventos -->
+    <div class="card">
+      <div class="card-title">
+        <h3>Eventos registrados</h3>
+        <button class="btn btn-outline btn-sm" onclick="cargarEventos()">Actualizar</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Evento</th>
+            <th>Fecha</th>
+            <th>Ocupación</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tablaEventos">
+          <tr><td colspan="4" class="empty-state">Cargando eventos…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+Sesion.requerirOrganizador();
+  pintarUsuarioNavbar();
+
+  const formEvento = document.getElementById("formEvento");
+  const errorEvento = document.getElementById("errorEvento");
+  const btnCrearEvento = document.getElementById("btnCrearEvento");
+  const tablaEventos = document.getElementById("tablaEventos");
+
+  formEvento.addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    errorEvento.classList.remove("visible");
+    btnCrearEvento.disabled = true;
+    btnCrearEvento.textContent = "Creando…";
+
+    const payload = {
+      nombre: document.getElementById("nombre").value.trim(),
+      descripcion: document.getElementById("descripcion").value.trim(),
+      cupo_total: parseInt(document.getElementById("cupo_total").value, 10),
+      fecha: document.getElementById("fecha").value.replace("T", " ") + ":00",
+    };
+
+    try {
+      const resultado = await EventosAPI.crear(payload);
+      if (resultado.status === "ok") {
+        mostrarToast("Evento creado correctamente", "success");
+        formEvento.reset();
+        cargarEventos();
+      } else {
+        throw new Error(resultado.mensaje || "No se pudo crear el evento");
+      }
+    } catch (err) {
+      errorEvento.textContent = err.message;
+      errorEvento.classList.add("visible");
+    } finally {
+      btnCrearEvento.disabled = false;
+      btnCrearEvento.textContent = "Crear evento";
+    }
+  });
+
+  function claseCupo(porcentaje) {
+    if (porcentaje >= 100) return "lleno";
+    if (porcentaje >= 75) return "alto";
+    return "";
+  }
+
+  async function cargarEventos() {
+    tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">Cargando eventos…</td></tr>`;
+    try {
+      const eventos = await EventosAPI.listar();
+      if (!eventos || eventos.length === 0) {
+        tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">Aún no hay eventos registrados.</td></tr>`;
+        return;
+      }
+
+      const filas = eventos.map((ev) => {
+        const porcentaje = ev.cupo_total > 0 ? Math.round((ev.cupo_ocupado / ev.cupo_total) * 100) : 0;
+        const fecha = ev.fecha ? new Date(ev.fecha.replace(" ", "T")).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }) : "—";
+        return `
+          <tr>
+            <td>
+              <div style="font-weight:600;">${escaparHTML(ev.nombre)}</div>
+              <div class="hint">${ev.cupo_ocupado}/${ev.cupo_total} inscritos</div>
+            </td>
+            <td>${fecha}</td>
+            <td style="min-width:140px;">
+              <div class="cupo-bar"><div class="cupo-bar-fill ${claseCupo(porcentaje)}" style="width:${Math.min(porcentaje,100)}%"></div></div>
+              <div class="hint">${porcentaje}% ocupado</div>
+            </td>
+            <td class="table-actions">
+              <a class="btn btn-outline btn-sm" href="conferencistas.html?evento_id=${ev.id}">Conferencistas</a>
+              <a class="btn btn-outline btn-sm" href="inscripcion.html?evento_id=${ev.id}">Inscribir</a>
+            </td>
+          </tr>`;
+      }).join("");
+
+      tablaEventos.innerHTML = filas;
+    } catch (err) {
+      tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">${err.message}</td></tr>`;
+    }
+  }
+
+  function escaparHTML(texto) {
+    const div = document.createElement("div");
+    div.textContent = texto ?? "";
+    return div.innerHTML;
+  }
+
+  cargarEventos();
+</script>
+</body>
+</html>

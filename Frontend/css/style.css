@@ -1,0 +1,518 @@
+/* =========================================================================
+   style.css
+   Pertenece a: Integrante 3 - Frontend
+   Proyecto: Plataforma de Gestión de Eventos y Acreditaciones (Grupo 6)
+   Hoja de estilos compartida por todas las páginas del Frontend.
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
+/* -------------------------------------------------------------------------
+   Tokens de diseño
+   ------------------------------------------------------------------------- */
+:root{
+  /* color */
+  --color-bg: #F6F5F0;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #EFECE3;
+  --color-border: #E1DDD0;
+  --color-text: #232733;
+  --color-text-muted: #6B7280;
+  --color-primary: #2F6F5E;      /* verde-teal profundo, institucional */
+  --color-primary-dark: #1F4E42;
+  --color-primary-soft: #E4EEE9;
+  --color-accent: #C08A3E;       /* dorado credencial, para acreditación/estados */
+  --color-accent-soft: #F5E9D3;
+  --color-danger: #B3492D;
+  --color-danger-soft: #F5E1D9;
+
+  /* tipografía */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* geometría */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(35,39,51,0.06);
+  --shadow-md: 0 6px 20px rgba(35,39,51,0.08);
+
+  --content-width: 1120px;
+}
+
+*{ box-sizing: border-box; }
+
+html, body{
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4{
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 6px 0;
+}
+
+p{ margin: 0 0 12px 0; color: var(--color-text-muted); }
+
+a{ color: var(--color-primary); text-decoration: none; }
+a:hover{ text-decoration: underline; }
+
+/* -------------------------------------------------------------------------
+   Menú horizontal superior
+   ------------------------------------------------------------------------- */
+.navbar{
+  width: 100%;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.navbar-inner{
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 0 28px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.brand{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--color-text);
+}
+
+.brand-mark{
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.nav-links{
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  justify-content: center;
+}
+
+.nav-links a{
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-links a:hover{
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.nav-links a.active{
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
+}
+
+.nav-user{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.nav-user #nombreUsuario{
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.btn-logout{
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn-logout:hover{ border-color: var(--color-danger); color: var(--color-danger); }
+
+/* -------------------------------------------------------------------------
+   Layout general
+   ------------------------------------------------------------------------- */
+.page{
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 36px 28px 64px 28px;
+}
+
+.page-header{
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.eyebrow{
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin-bottom: 6px;
+}
+
+.grid-2{
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px){
+  .grid-2{ grid-template-columns: 1fr; }
+  .nav-links{ display: none; }
+}
+
+/* -------------------------------------------------------------------------
+   Tarjetas / superficies
+   ------------------------------------------------------------------------- */
+.card{
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card + .card{ margin-top: 20px; }
+
+.card-title{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.card-title h3{ font-size: 17px; margin: 0; }
+
+/* borde de "credencial" — elemento distintivo para módulos de
+   asistencia y acreditación (evoca el talonario de un gafete de evento) */
+.card-credential{
+  position: relative;
+  padding-top: 30px;
+}
+.card-credential::before{
+  content: "";
+  position: absolute;
+  top: 0; left: 24px; right: 24px;
+  height: 14px;
+  background-image: radial-gradient(circle, var(--color-bg) 3px, transparent 3.5px);
+  background-size: 14px 14px;
+  background-position: bottom;
+  background-repeat: repeat-x;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+/* -------------------------------------------------------------------------
+   Formularios
+   ------------------------------------------------------------------------- */
+.field{ margin-bottom: 16px; }
+
+.field label{
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.field input,
+.field select,
+.field textarea{
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field textarea{ resize: vertical; min-height: 80px; }
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus{
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.field-row{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* -------------------------------------------------------------------------
+   Botones
+   ------------------------------------------------------------------------- */
+.btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.05s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.btn:active{ transform: translateY(1px); }
+
+.btn-primary{ background: var(--color-primary); color: #fff; }
+.btn-primary:hover{ background: var(--color-primary-dark); }
+
+.btn-outline{ background: transparent; border-color: var(--color-border); color: var(--color-text); }
+.btn-outline:hover{ border-color: var(--color-primary); color: var(--color-primary-dark); }
+
+.btn-accent{ background: var(--color-accent); color: #fff; }
+.btn-accent:hover{ filter: brightness(0.93); }
+
+.btn-block{ width: 100%; }
+.btn-sm{ padding: 6px 12px; font-size: 12.5px; }
+
+.btn[disabled]{ opacity: 0.55; cursor: not-allowed; }
+
+/* -------------------------------------------------------------------------
+   Tablas
+   ------------------------------------------------------------------------- */
+table{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+thead th{
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+tbody td{
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+tbody tr:hover{ background: var(--color-surface-alt); }
+
+.table-actions{ display: flex; gap: 6px; }
+
+/* -------------------------------------------------------------------------
+   Badges / estados
+   ------------------------------------------------------------------------- */
+.badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.badge-success{ background: var(--color-primary-soft); color: var(--color-primary-dark); }
+.badge-warning{ background: var(--color-accent-soft); color: #8A5E1F; }
+.badge-danger{ background: var(--color-danger-soft); color: var(--color-danger); }
+
+/* -------------------------------------------------------------------------
+   Barra de progreso de cupo
+   ------------------------------------------------------------------------- */
+.cupo-bar{
+  width: 100%;
+  height: 8px;
+  background: var(--color-surface-alt);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.cupo-bar-fill{
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.cupo-bar-fill.alto{ background: var(--color-accent); }
+.cupo-bar-fill.lleno{ background: var(--color-danger); }
+
+/* -------------------------------------------------------------------------
+   Modales (usados por "módulos" de asistencia y acreditación)
+   ------------------------------------------------------------------------- */
+.modal-overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(35, 39, 51, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.modal-overlay.abierto{ display: flex; }
+
+.modal{
+  width: 100%;
+  max-width: 460px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.modal-header{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 0 24px;
+}
+
+.modal-close{
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+.modal-close:hover{ color: var(--color-text); }
+
+.modal-body{ padding: 16px 24px 24px 24px; }
+
+.modal-footer{
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 24px 24px 24px;
+}
+
+/* -------------------------------------------------------------------------
+   Utilidades
+   ------------------------------------------------------------------------- */
+.hint{ font-size: 12.5px; color: var(--color-text-muted); }
+.mt-0{ margin-top: 0; }
+.mb-0{ margin-bottom: 0; }
+.text-center{ text-align: center; }
+.empty-state{
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-text-muted);
+}
+
+.toast{
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--color-text);
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+  z-index: 200;
+}
+.toast.visible{ opacity: 1; transform: translateY(0); }
+.toast.error{ background: var(--color-danger); }
+.toast.success{ background: var(--color-primary-dark); }
+
+/* -------------------------------------------------------------------------
+   Pantallas de autenticación (login / registro)
+   ------------------------------------------------------------------------- */
+.auth-shell{
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card{
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 34px 32px;
+}
+
+.auth-brand{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.auth-footer{
+  margin-top: 18px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.form-error{
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  display: none;
+}
+.form-error.visible{ display: block; }
