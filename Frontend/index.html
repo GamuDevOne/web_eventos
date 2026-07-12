@@ -1,0 +1,32 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Gestión de Eventos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-card text-center">
+    <div class="auth-brand" style="justify-content:center;">
+      <span class="brand-mark">GE</span>
+    </div>
+    <h2 class="mt-0">Gestión de Eventos</h2>
+    <p>Cargando…</p>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  const usuario = Sesion.obtener();
+  if (usuario) {
+    window.location.href = usuario.rol === "organizador" ? "dashboard.html" : "participante.html";
+  } else {
+    window.location.href = "login.html";
+  }
+</script>
+</body>
+</html>
