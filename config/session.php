@@ -25,3 +25,39 @@ session_set_cookie_params([
 ]);
 
 session_start();
+$tiempoMaximoInactividad = 1800; // 30 minutos
+
+if (
+    isset($_SESSION['ultima_actividad']) &&
+    (time() - $_SESSION['ultima_actividad']) > $tiempoMaximoInactividad
+) {
+    $_SESSION = [];
+
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+
+        setcookie(session_name(), '', [
+    'expires' => time() - 42000,
+    'path' => $params['path'],
+    'domain' => $params['domain'],
+    'secure' => $params['secure'],
+    'httponly' => $params['httponly'],
+    'samesite' => 'Lax'
+]);
+    }
+
+    session_destroy();
+
+    http_response_code(401);
+
+    echo json_encode([
+        'status' => 'error',
+        'mensaje' => 'La sesión expiró por inactividad. Inicia sesión nuevamente.'
+    ], JSON_UNESCAPED_UNICODE);
+
+    exit;
+}
+
+if (!empty($_SESSION['usuario_id'])) {
+    $_SESSION['ultima_actividad'] = time();
+}
