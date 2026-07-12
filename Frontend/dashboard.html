@@ -1,0 +1,175 @@
+<!-- =========================================================================
+     dashboard.html
+     Pertenece a: Integrante 3 - Frontend
+     Proyecto: Plataforma de Gestión de Eventos y Acreditaciones (Grupo 6)
+
+     Dashboard de ocupación en tiempo real, requerido por el reto
+     "Control Inteligente de Aforo" del README (usa Chart.js).
+     ========================================================================= -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard · Gestión de Eventos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-inner">
+    <div class="brand"><span class="brand-mark">GE</span> Gestión de Eventos</div>
+    <div class="nav-links">
+      <a href="dashboard.html" class="active">Dashboard</a>
+      <a href="eventos.html">Eventos</a>
+      <a href="conferencistas.html">Conferencistas</a>
+      <a href="inscripcion.html">Inscripciones</a>
+    </div>
+    <div class="nav-user">
+      <span id="nombreUsuario">—</span>
+      <button class="btn-logout" onclick="Sesion.cerrar()">Salir</button>
+    </div>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="eyebrow">Tiempo real</div>
+      <h1>Ocupación de eventos</h1>
+      <p>El gráfico se actualiza automáticamente cada 10 segundos.</p>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span class="badge badge-success" id="badgeActualizacion">● en vivo</span>
+      <button class="btn btn-outline btn-sm" onclick="cargarDashboard()">Actualizar ahora</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-title"><h3>% de ocupación por evento</h3></div>
+    <div style="position:relative; height:340px;">
+      <canvas id="graficoOcupacion"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><h3>Detalle por evento</h3></div>
+    <table>
+      <thead>
+        <tr><th>Evento</th><th>Cupo total</th><th>Ocupados</th><th>% ocupación</th><th>Estado</th></tr>
+      </thead>
+      <tbody id="tablaDetalle">
+        <tr><td colspan="5" class="empty-state">Cargando datos…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  Sesion.requerirOrganizador();
+  pintarUsuarioNavbar();
+
+  const ctx = document.getElementById("graficoOcupacion").getContext("2d");
+  let grafico = null;
+
+  const paletaBarras = ["#2F6F5E", "#C08A3E", "#3E8E76", "#A9702D", "#5FA98E", "#D9A75C"];
+
+  function estadoDe(porcentaje) {
+    if (porcentaje >= 100) return { texto: "Lleno", clase: "badge-danger" };
+    if (porcentaje >= 75) return { texto: "Casi lleno", clase: "badge-warning" };
+    return { texto: "Disponible", clase: "badge-success" };
+  }
+
+  async function cargarDashboard() {
+    const badge = document.getElementById("badgeActualizacion");
+    badge.textContent = "● actualizando";
+
+    try {
+      const eventos = await EventosAPI.listar();
+
+      const etiquetas = eventos.map((ev) => ev.nombre);
+      const porcentajes = eventos.map((ev) =>
+        ev.cupo_total > 0 ? Math.round((ev.cupo_ocupado / ev.cupo_total) * 100) : 0
+      );
+      const colores = eventos.map((_, i) => paletaBarras[i % paletaBarras.length]);
+
+      if (grafico) {
+        grafico.data.labels = etiquetas;
+        grafico.data.datasets[0].data = porcentajes;
+        grafico.data.datasets[0].backgroundColor = colores;
+        grafico.update();
+      } else {
+        grafico = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: etiquetas,
+            datasets: [{
+              label: "% de ocupación",
+              data: porcentajes,
+              backgroundColor: colores,
+              borderRadius: 6,
+              maxBarThickness: 56,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: { callback: (v) => v + "%" },
+                grid: { color: "#E1DDD0" },
+              },
+              x: { grid: { display: false } },
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (item) => ` ${item.raw}% ocupado`,
+                },
+              },
+            },
+          },
+        });
+      }
+
+      const tabla = document.getElementById("tablaDetalle");
+      if (eventos.length === 0) {
+        tabla.innerHTML = `<tr><td colspan="5" class="empty-state">No hay eventos registrados todavía.</td></tr>`;
+      } else {
+        tabla.innerHTML = eventos.map((ev) => {
+          const porcentaje = ev.cupo_total > 0 ? Math.round((ev.cupo_ocupado / ev.cupo_total) * 100) : 0;
+          const estado = estadoDe(porcentaje);
+          return `
+            <tr>
+              <td style="font-weight:600;">${escaparHTML(ev.nombre)}</td>
+              <td>${ev.cupo_total}</td>
+              <td>${ev.cupo_ocupado}</td>
+              <td>${porcentaje}%</td>
+              <td><span class="badge ${estado.clase}">${estado.texto}</span></td>
+            </tr>`;
+        }).join("");
+      }
+
+      badge.textContent = "● en vivo";
+    } catch (err) {
+      badge.textContent = "● sin conexión";
+      mostrarToast(err.message, "error");
+    }
+  }
+
+  function escaparHTML(texto) {
+    const div = document.createElement("div");
+    div.textContent = texto ?? "";
+    return div.innerHTML;
+  }
+
+  cargarDashboard();
+  setInterval(cargarDashboard, 10000); // refresco automático cada 10s
+</script>
+</body>
+</html>

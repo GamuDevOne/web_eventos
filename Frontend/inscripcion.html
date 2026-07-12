@@ -1,0 +1,274 @@
+<!-- =========================================================================
+     inscripcion.html
+     Pertenece a: Integrante 3 - Frontend
+     Proyecto: Plataforma de Gestión de Eventos y Acreditaciones (Grupo 6)
+
+     Incluye los dos módulos pedidos como ventanas modales:
+       - Módulo de control de asistencia   -> #modalAsistencia
+       - Módulo de generación/visualización
+         de acreditaciones                 -> #modalAcreditacion
+
+     NOTA: el backend aún no expone un endpoint para LISTAR las
+     inscripciones de un evento (sólo existe sp_inscribir_participante).
+     Mientras Integrante 2 agrega ese endpoint, los modales piden el
+     "ID de inscripción" manualmente (visible en phpMyAdmin/Postman).
+     Ver TODO backend en api.js.
+     ========================================================================= -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Inscripciones · Gestión de Eventos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-inner">
+    <div class="brand"><span class="brand-mark">GE</span> Gestión de Eventos</div>
+    <div class="nav-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="eventos.html">Eventos</a>
+      <a href="conferencistas.html">Conferencistas</a>
+      <a href="inscripcion.html" class="active">Inscripciones</a>
+    </div>
+    <div class="nav-user">
+      <span id="nombreUsuario">—</span>
+      <button class="btn-logout" onclick="Sesion.cerrar()">Salir</button>
+    </div>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="eyebrow">Participantes</div>
+      <h1>Inscripciones</h1>
+      <p>Inscribe participantes a un evento y gestiona asistencia y acreditación.</p>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Formulario: inscribir participante -->
+    <div class="card">
+      <div class="card-title"><h3>Inscribir participante</h3></div>
+      <div class="form-error" id="errorInscripcion"></div>
+      <form id="formInscripcion">
+        <div class="field">
+          <label for="selectorEvento">Evento</label>
+          <select id="selectorEvento" required></select>
+        </div>
+        <div class="field">
+          <label for="participante_id">ID del participante</label>
+          <input type="number" id="participante_id" min="1" placeholder="Ej. 2" required>
+          <div class="hint">El participante debe existir previamente en la tabla de usuarios.</div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnInscribir">Inscribir</button>
+      </form>
+    </div>
+
+    <!-- Módulos: asistencia y acreditación -->
+    <div class="card card-credential">
+      <div class="card-title"><h3>Módulos de gestión</h3></div>
+      <p>Estas acciones abren una ventana emergente (módulo) para registrar
+      asistencia o generar la acreditación digital de una inscripción.</p>
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <button class="btn btn-outline" onclick="abrirModal('modalAsistencia')">
+          ✓ Registrar asistencia
+        </button>
+        <button class="btn btn-accent" onclick="abrirModal('modalAcreditacion')">
+          ★ Generar acreditación
+        </button>
+      </div>
+
+      <div class="card" style="margin-top:20px; background:var(--color-surface-alt); box-shadow:none;">
+        <div class="hint">
+          <strong>Último resultado:</strong>
+          <div id="ultimoResultado">Aún no se ha ejecutado ninguna acción.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== MÓDULO: ASISTENCIA (modal) ======================== -->
+<div class="modal-overlay" id="overlayAsistencia">
+  <div class="modal card-credential">
+    <div class="modal-header">
+      <div>
+        <div class="eyebrow">Módulo</div>
+        <h3 class="mb-0">Control de asistencia</h3>
+      </div>
+      <button class="modal-close" onclick="cerrarModal('modalAsistencia')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-error" id="errorAsistencia"></div>
+      <form id="formAsistencia">
+        <div class="field">
+          <label for="asistencia_inscripcion_id">ID de inscripción</label>
+          <input type="number" id="asistencia_inscripcion_id" min="1" required>
+        </div>
+        <div class="field">
+          <label for="asistencia_presente">¿El participante se presentó?</label>
+          <select id="asistencia_presente" required>
+            <option value="1">Sí, presente</option>
+            <option value="0">No asistió</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Registrar asistencia</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== MÓDULO: ACREDITACIÓN (modal) ======================== -->
+<div class="modal-overlay" id="overlayAcreditacion">
+  <div class="modal card-credential">
+    <div class="modal-header">
+      <div>
+        <div class="eyebrow">Módulo</div>
+        <h3 class="mb-0">Generar acreditación</h3>
+      </div>
+      <button class="modal-close" onclick="cerrarModal('modalAcreditacion')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-error" id="errorAcreditacion"></div>
+      <form id="formAcreditacion">
+        <div class="field">
+          <label for="acreditacion_inscripcion_id">ID de inscripción</label>
+          <input type="number" id="acreditacion_inscripcion_id" min="1" required>
+        </div>
+        <div class="field">
+          <label for="acreditacion_codigo">Código único</label>
+          <input type="text" id="acreditacion_codigo" placeholder="ACR-004-XYZ" required>
+        </div>
+        <div class="field">
+          <label for="acreditacion_url">URL de descarga (PDF)</label>
+          <input type="text" id="acreditacion_url" placeholder="/acreditaciones/ACR-004-XYZ.pdf" required>
+        </div>
+        <button type="submit" class="btn btn-accent btn-block">Generar acreditación</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+Sesion.requerirOrganizador();
+  pintarUsuarioNavbar();
+
+  const selectorEvento = document.getElementById("selectorEvento");
+  const parametros = new URLSearchParams(window.location.search);
+  const eventoPreseleccionado = parametros.get("evento_id");
+  const ultimoResultado = document.getElementById("ultimoResultado");
+
+  async function cargarSelectorEventos() {
+    try {
+      const eventos = await EventosAPI.listar();
+      selectorEvento.innerHTML = eventos
+        .map((ev) => `<option value="${ev.id}">${escaparHTML(ev.nombre)}</option>`)
+        .join("");
+      if (eventoPreseleccionado) selectorEvento.value = eventoPreseleccionado;
+    } catch (err) {
+      selectorEvento.innerHTML = `<option>Sin eventos disponibles</option>`;
+    }
+  }
+
+  document.getElementById("formInscripcion").addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const errorBox = document.getElementById("errorInscripcion");
+    errorBox.classList.remove("visible");
+
+    const evento_id = selectorEvento.value;
+    const participante_id = parseInt(document.getElementById("participante_id").value, 10);
+
+    try {
+      const resultado = await EventosAPI.inscribir(evento_id, participante_id);
+      if (resultado.status === "success") {
+        mostrarToast(resultado.mensaje, "success");
+        ultimoResultado.textContent = resultado.mensaje;
+        document.getElementById("formInscripcion").reset();
+        selectorEvento.value = evento_id;
+      } else {
+        throw new Error(resultado.mensaje || "No se pudo inscribir al participante");
+      }
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.add("visible");
+    }
+  });
+
+  document.getElementById("formAsistencia").addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const errorBox = document.getElementById("errorAsistencia");
+    errorBox.classList.remove("visible");
+
+    const inscripcion_id = parseInt(document.getElementById("asistencia_inscripcion_id").value, 10);
+    const presente = parseInt(document.getElementById("asistencia_presente").value, 10);
+
+    try {
+      const resultado = await EventosAPI.registrarAsistencia(inscripcion_id, presente);
+      if (resultado.status === "success") {
+        mostrarToast(resultado.mensaje, "success");
+        ultimoResultado.textContent = resultado.mensaje;
+        cerrarModal("modalAsistencia");
+        document.getElementById("formAsistencia").reset();
+      } else {
+        throw new Error(resultado.mensaje || "No se pudo registrar la asistencia");
+      }
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.add("visible");
+    }
+  });
+
+  document.getElementById("formAcreditacion").addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const errorBox = document.getElementById("errorAcreditacion");
+    errorBox.classList.remove("visible");
+
+    const inscripcion_id = parseInt(document.getElementById("acreditacion_inscripcion_id").value, 10);
+    const codigo_unico = document.getElementById("acreditacion_codigo").value.trim();
+    const url = document.getElementById("acreditacion_url").value.trim();
+
+    try {
+      const resultado = await EventosAPI.generarAcreditacion(inscripcion_id, codigo_unico, url);
+      if (resultado.codigo_unico) {
+        mostrarToast("Acreditación generada: " + resultado.codigo_unico, "success");
+        ultimoResultado.textContent = `Acreditación ${resultado.codigo_unico} generada correctamente.`;
+        cerrarModal("modalAcreditacion");
+        document.getElementById("formAcreditacion").reset();
+      } else {
+        throw new Error(resultado.mensaje || "No se pudo generar la acreditación");
+      }
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.add("visible");
+    }
+  });
+
+  function abrirModal(id) {
+    document.getElementById("overlay" + id.replace("modal", "")).classList.add("abierto");
+  }
+  function cerrarModal(id) {
+    document.getElementById("overlay" + id.replace("modal", "")).classList.remove("abierto");
+  }
+  // Cerrar al hacer clic fuera del cuadro del modal
+  document.querySelectorAll(".modal-overlay").forEach((overlay) => {
+    overlay.addEventListener("click", (evento) => {
+      if (evento.target === overlay) overlay.classList.remove("abierto");
+    });
+  });
+
+  function escaparHTML(texto) {
+    const div = document.createElement("div");
+    div.textContent = texto ?? "";
+    return div.innerHTML;
+  }
+
+  cargarSelectorEventos();
+</script>
+</body>
+</html>
