@@ -15,6 +15,7 @@ class Database {
                 $this->password
             );
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->conn->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
         } catch (PDOException $e) {
             http_response_code(500);
             echo json_encode(["error" => "Conexión fallida: " . $e->getMessage()]);

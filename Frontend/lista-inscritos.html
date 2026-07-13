@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Lista de inscritos · Gestión de Eventos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-inner">
+    <div class="brand"><span class="brand-mark">GE</span> Gestión de Eventos</div>
+    <div class="nav-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="eventos.html">Eventos</a>
+      <a href="conferencistas.html">Conferencistas</a>
+      <a href="inscripcion.html" class="active">Inscripciones</a>
+    </div>
+    <div class="nav-user">
+      <span id="nombreUsuario">—</span>
+      <button class="btn-logout" onclick="Sesion.cerrar()">Salir</button>
+    </div>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="eyebrow">Organización</div>
+      <h1>Lista de inscritos</h1>
+      <p>Busca un evento y revisa quién asistió, quién no y genera acreditaciones.</p>
+    </div>
+    <a class="btn btn-outline" href="inscripcion.html">← Volver a inscripciones</a>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-title"><h3>Seleccionar evento</h3></div>
+    <div class="field-row">
+      <div class="field">
+        <label for="buscarEvento">Buscar evento por nombre</label>
+        <input type="text" id="buscarEvento" placeholder="Escribe para filtrar…">
+      </div>
+      <div class="field">
+        <label for="selectorEvento">Evento</label>
+        <select id="selectorEvento"></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <h3 id="tituloLista">Inscritos</h3>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input type="text" id="buscarParticipante" placeholder="Buscar por nombre o código…" style="padding:8px 10px; border:1px solid var(--color-border); border-radius:var(--radius-sm); font-size:13px;">
+        <button class="btn btn-outline btn-sm" onclick="cargarInscritos()">Actualizar</button>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Participante</th>
+          <th>Correo</th>
+          <th>Estado</th>
+          <th>Acreditación</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tablaInscritos">
+        <tr><td colspan="6" class="empty-state">Selecciona un evento para ver su lista de inscritos.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="overlayAcreditar">
+  <div class="modal card-credential">
+    <div class="modal-header">
+      <div>
+        <div class="eyebrow">Módulo</div>
+        <h3 class="mb-0">Generar acreditación digital</h3>
+      </div>
+      <button class="modal-close" onclick="cerrarModalAcreditar()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="hint" style="margin-bottom:16px;">
+        Participante: <strong id="acreditarNombre">—</strong><br>
+        Inscripción #<span id="acreditarInscripcionId">—</span>
+      </p>
+      <div class="form-error" id="errorAcreditarModal"></div>
+      <form id="formAcreditarModal">
+        <div class="field">
+          <label for="acreditarCodigo">Código único (opcional)</label>
+          <input type="text" id="acreditarCodigo" placeholder="Se genera automáticamente si lo dejas vacío">
+        </div>
+        <button type="submit" class="btn btn-accent btn-block">Generar acreditación digital</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  Sesion.requerirOrganizador();
+  pintarUsuarioNavbar();
+
+  const selectorEvento = document.getElementById("selectorEvento");
+  const buscarEvento = document.getElementById("buscarEvento");
+  const buscarParticipante = document.getElementById("buscarParticipante");
+  const tablaInscritos = document.getElementById("tablaInscritos");
+  const tituloLista = document.getElementById("tituloLista");
+
+  const parametros = new URLSearchParams(window.location.search);
+  const eventoPreseleccionado = parametros.get("evento_id");
+
+  let eventosCache = [];
+  let eventoActual = null;
+  let inscritosCache = [];
+
+  async function cargarSelectorEventos() {
+    try {
+      eventosCache = await EventosAPI.listar();
+      pintarSelectorEventos(eventosCache);
+      if (eventoPreseleccionado) selectorEvento.value = eventoPreseleccionado;
+      if (selectorEvento.value) cargarInscritos();
+    } catch (err) {
+      selectorEvento.innerHTML = `<option>Sin eventos disponibles</option>`;
+    }
+  }
+
+  function pintarSelectorEventos(lista) {
+    if (lista.length === 0) {
+      selectorEvento.innerHTML = `<option value="">Sin eventos disponibles</option>`;
+      return;
+    }
+    const valorActual = selectorEvento.value;
+    selectorEvento.innerHTML = lista.map((ev) => `<option value="${ev.id}">${escaparHTML(ev.nombre)}</option>`).join("");
+    if (valorActual && lista.some((ev) => String(ev.id) === valorActual)) {
+      selectorEvento.value = valorActual;
+    }
+  }
+
+  buscarEvento.addEventListener("input", () => {
+    const texto = buscarEvento.value.trim().toLowerCase();
+    const filtrados = texto ? eventosCache.filter((ev) => ev.nombre.toLowerCase().includes(texto)) : eventosCache;
+    pintarSelectorEventos(filtrados);
+  });
+
+  selectorEvento.addEventListener("change", cargarInscritos);
+  buscarParticipante.addEventListener("input", pintarTablaFiltrada);
+
+  async function cargarInscritos() {
+    const evento_id = selectorEvento.value;
+    if (!evento_id) return;
+
+    tablaInscritos.innerHTML = `<tr><td colspan="6" class="empty-state">Cargando inscritos…</td></tr>`;
+    try {
+      inscritosCache = await EventosAPI.listarInscripciones(evento_id);
+      if (inscritosCache.length > 0) {
+        eventoActual = { nombre: inscritosCache[0].evento_nombre, fecha: inscritosCache[0].evento_fecha };
+      } else {
+        const ev = eventosCache.find((e) => String(e.id) === String(evento_id));
+        eventoActual = ev ? { nombre: ev.nombre, fecha: ev.fecha } : null;
+      }
+      tituloLista.textContent = eventoActual ? `Inscritos · ${eventoActual.nombre}` : "Inscritos";
+      pintarTablaFiltrada();
+    } catch (err) {
+      tablaInscritos.innerHTML = `<tr><td colspan="6" class="empty-state">${err.message}</td></tr>`;
+    }
+  }
+
+  function eventoFinalizado() {
+    if (!eventoActual || !eventoActual.fecha) return false;
+    return new Date(eventoActual.fecha.replace(" ", "T")).getTime() < Date.now();
+  }
+
+  function estaPresente(insc) {
+    return insc.presente === 1 || insc.presente === "1" || insc.presente === true;
+  }
+
+  function estadoFila(insc) {
+    if (estaPresente(insc)) return { texto: "Asistió", badge: "badge-success" };
+    if (eventoFinalizado()) return { texto: "No asistió", badge: "badge-danger" };
+    return { texto: "Pendiente", badge: "badge-warning" };
+  }
+
+  function pintarTablaFiltrada() {
+    const texto = buscarParticipante.value.trim().toLowerCase();
+    const filtrados = texto
+      ? inscritosCache.filter((i) =>
+          i.participante_nombre.toLowerCase().includes(texto) ||
+          String(i.participante_codigo || "").toLowerCase().includes(texto) ||
+          String(i.inscripcion_id).includes(texto)
+        )
+      : inscritosCache;
+
+    if (filtrados.length === 0) {
+      tablaInscritos.innerHTML = `<tr><td colspan="6" class="empty-state">No hay inscritos que coincidan con la búsqueda.</td></tr>`;
+      return;
+    }
+
+    tablaInscritos.innerHTML = filtrados.map((insc) => {
+      const estado = estadoFila(insc);
+      const yaAcreditado = !!insc.acreditacion_id;
+      const puedeAcreditar = estaPresente(insc) && !yaAcreditado;
+
+      let botonAcreditacion;
+   if (yaAcreditado) {
+        botonAcreditacion = `<button class="btn btn-outline btn-sm btn-ver-acreditacion" data-id="${insc.inscripcion_id}">✓ Ver acreditación</button>`;
+      } else if (puedeAcreditar) {
+        botonAcreditacion = `<button class="btn btn-accent btn-sm btn-acreditar" data-id="${insc.inscripcion_id}" data-nombre="${escaparHTML(insc.participante_nombre)}">★ Acreditar</button>`;
+      } else {
+        botonAcreditacion = `<button class="btn btn-outline btn-sm" disabled title="Solo se acredita a quienes asistieron">★ Acreditar</button>`;
+      }
+
+      return `
+        <tr>
+          <td><span class="codigo-tag">${escaparHTML(insc.participante_codigo || '—')}</span></td>
+          <td style="font-weight:600;">${escaparHTML(insc.participante_nombre)}</td>
+          <td class="hint">${escaparHTML(insc.participante_email || "—")}</td>
+          <td><span class="badge ${estado.badge}">${estado.texto}</span></td>
+          <td>${botonAcreditacion}</td>
+          <td>
+            <button class="btn btn-outline btn-sm btn-cancelar-insc" data-id="${insc.inscripcion_id}" data-nombre="${escaparHTML(insc.participante_nombre)}" style="color:var(--color-danger); border-color:var(--color-danger);">Cancelar</button>
+          </td>
+        </tr>`;
+    }).join("");
+  }
+
+ tablaInscritos.addEventListener("click", (evento) => {
+    const btnAcreditar = evento.target.closest(".btn-acreditar");
+    const btnCancelar = evento.target.closest(".btn-cancelar-insc");
+    const btnVer = evento.target.closest(".btn-ver-acreditacion");
+    if (btnAcreditar) abrirModalAcreditar(btnAcreditar.dataset.id, btnAcreditar.dataset.nombre);
+    if (btnCancelar) cancelarInscripcion(btnCancelar.dataset.id, btnCancelar.dataset.nombre);
+    if (btnVer) verAcreditacion(btnVer.dataset.id);
+  });
+
+  function verAcreditacion(inscripcionId) {
+    const insc = inscritosCache.find((i) => String(i.inscripcion_id) === String(inscripcionId));
+    if (!insc) return;
+    mostrarAcreditacionDigital({
+      participanteNombre: insc.participante_nombre,
+      participanteCodigo: insc.participante_codigo,
+      eventoNombre: insc.evento_nombre,
+      eventoFecha: insc.evento_fecha,
+      codigoUnico: insc.codigo_unico,
+      fechaEmision: insc.acreditacion_fecha_emision,
+    });
+  }
+  async function cancelarInscripcion(inscripcion_id, nombre) {
+    const confirmado = await confirmarAccion(
+      `¿Cancelar la inscripción de "${nombre}"? Solo es posible si faltan más de 4 días para el evento.`,
+      "Sí, cancelar"
+    );
+    if (!confirmado) return;
+
+    try {
+      const resultado = await EventosAPI.cancelarInscripcion(inscripcion_id);
+      if (resultado.status === "success") {
+        mostrarToast(resultado.mensaje, "success");
+        cargarInscritos();
+      } else {
+        throw new Error(resultado.mensaje || "No se pudo cancelar la inscripción");
+      }
+    } catch (err) {
+      mostrarToast(err.message, "error");
+    }
+  }
+
+function abrirModalAcreditar(id, nombre) {
+    document.getElementById("errorAcreditarModal").classList.remove("visible");
+    document.getElementById("acreditarNombre").textContent = nombre;
+    document.getElementById("acreditarInscripcionId").textContent = id;
+    document.getElementById("formAcreditarModal").dataset.inscripcionId = id;
+    document.getElementById("acreditarCodigo").value = "";
+    document.getElementById("overlayAcreditar").classList.add("abierto");
+  }
+
+  function cerrarModalAcreditar() {
+    document.getElementById("overlayAcreditar").classList.remove("abierto");
+  }
+
+  document.getElementById("overlayAcreditar").addEventListener("click", (evento) => {
+    if (evento.target.id === "overlayAcreditar") cerrarModalAcreditar();
+  });
+
+ document.getElementById("formAcreditarModal").addEventListener("submit", async (evento) => {
+    evento.preventDefault();
+    const errorBox = document.getElementById("errorAcreditarModal");
+    errorBox.classList.remove("visible");
+
+    const inscripcion_id = parseInt(evento.target.dataset.inscripcionId, 10);
+    const codigo_unico = document.getElementById("acreditarCodigo").value.trim();
+    const nombreParticipante = document.getElementById("acreditarNombre").textContent;
+
+    try {
+      const resultado = await EventosAPI.generarAcreditacion({ inscripcion_id, codigo_unico });
+      if (resultado.codigo_unico) {
+        mostrarToast("Acreditación digital generada", "success");
+        cerrarModalAcreditar();
+        await cargarInscritos();
+        mostrarAcreditacionDigital({
+          participanteNombre: nombreParticipante,
+          participanteCodigo: (inscritosCache.find(i => String(i.inscripcion_id) === String(inscripcion_id)) || {}).participante_codigo,
+          eventoNombre: eventoActual ? eventoActual.nombre : "",
+          eventoFecha: eventoActual ? eventoActual.fecha : null,
+          codigoUnico: resultado.codigo_unico,
+          fechaEmision: resultado.fecha_emision,
+        });
+      } else {
+        throw new Error(resultado.mensaje || "No se pudo generar la acreditación");
+      }
+    } catch (err) {
+      errorBox.textContent = err.message;
+      errorBox.classList.add("visible");
+    }
+  });
+
+  function escaparHTML(texto) {
+    const div = document.createElement("div");
+    div.textContent = texto ?? "";
+    return div.innerHTML;
+  }
+
+  cargarSelectorEventos();
+</script>
+</body>
+</html>

@@ -1,8 +1,3 @@
-<!-- =========================================================================
-     eventos.html
-     Pertenece a: Integrante 3 - Frontend
-     Proyecto: Plataforma de Gestión de Eventos y Acreditaciones (Grupo 6)
-     ========================================================================= -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -39,11 +34,14 @@
   </div>
 
   <div class="grid-2">
-    <!-- Formulario: crear evento -->
     <div class="card">
-      <div class="card-title"><h3>Nuevo evento</h3></div>
+      <div class="card-title">
+        <h3 id="tituloFormEvento">Nuevo evento</h3>
+        <a href="#" id="cancelarEdicionEvento" class="hint" style="display:none;">Cancelar edición</a>
+      </div>
       <div class="form-error" id="errorEvento"></div>
       <form id="formEvento">
+        <input type="hidden" id="evento_id_editar" value="">
         <div class="field">
           <label for="nombre">Nombre del evento</label>
           <input type="text" id="nombre" placeholder="Congreso de Tecnología 2026" required>
@@ -55,7 +53,7 @@
         <div class="field-row">
           <div class="field">
             <label for="cupo_total">Cupo total</label>
-            <input type="number" id="cupo_total" min="1" placeholder="50" required>
+            <input type="number" id="cupo_total" min="1" step="1" placeholder="50" required>
           </div>
           <div class="field">
             <label for="fecha">Fecha y hora</label>
@@ -66,7 +64,6 @@
       </form>
     </div>
 
-    <!-- Tabla: listado de eventos -->
     <div class="card">
       <div class="card-title">
         <h3>Eventos registrados</h3>
@@ -91,19 +88,25 @@
 
 <script src="js/api.js"></script>
 <script>
-Sesion.requerirOrganizador();
+  Sesion.requerirOrganizador();
   pintarUsuarioNavbar();
 
   const formEvento = document.getElementById("formEvento");
   const errorEvento = document.getElementById("errorEvento");
   const btnCrearEvento = document.getElementById("btnCrearEvento");
   const tablaEventos = document.getElementById("tablaEventos");
+  const tituloFormEvento = document.getElementById("tituloFormEvento");
+  const cancelarEdicionEventoLink = document.getElementById("cancelarEdicionEvento");
+  const eventoIdEditar = document.getElementById("evento_id_editar");
+
+  let eventosCache = [];
+  let modoEdicion = false;
 
   formEvento.addEventListener("submit", async (evento) => {
     evento.preventDefault();
     errorEvento.classList.remove("visible");
     btnCrearEvento.disabled = true;
-    btnCrearEvento.textContent = "Creando…";
+    btnCrearEvento.textContent = modoEdicion ? "Guardando…" : "Creando…";
 
     const payload = {
       nombre: document.getElementById("nombre").value.trim(),
@@ -113,20 +116,26 @@ Sesion.requerirOrganizador();
     };
 
     try {
-      const resultado = await EventosAPI.crear(payload);
+      let resultado;
+      if (modoEdicion) {
+        payload.id = parseInt(eventoIdEditar.value, 10);
+        resultado = await EventosAPI.editar(payload);
+      } else {
+        resultado = await EventosAPI.crear(payload);
+      }
       if (resultado.status === "ok") {
-        mostrarToast("Evento creado correctamente", "success");
-        formEvento.reset();
+        mostrarToast(modoEdicion ? "Evento actualizado correctamente" : "Evento creado correctamente", "success");
+        cancelarEdicion();
         cargarEventos();
       } else {
-        throw new Error(resultado.mensaje || "No se pudo crear el evento");
+        throw new Error(resultado.mensaje || "No se pudo guardar el evento");
       }
     } catch (err) {
       errorEvento.textContent = err.message;
       errorEvento.classList.add("visible");
     } finally {
       btnCrearEvento.disabled = false;
-      btnCrearEvento.textContent = "Crear evento";
+      btnCrearEvento.textContent = modoEdicion ? "Guardar cambios" : "Crear evento";
     }
   });
 
@@ -140,12 +149,13 @@ Sesion.requerirOrganizador();
     tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">Cargando eventos…</td></tr>`;
     try {
       const eventos = await EventosAPI.listar();
+      eventosCache = eventos;
       if (!eventos || eventos.length === 0) {
         tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">Aún no hay eventos registrados.</td></tr>`;
         return;
       }
 
-      const filas = eventos.map((ev) => {
+      tablaEventos.innerHTML = eventos.map((ev) => {
         const porcentaje = ev.cupo_total > 0 ? Math.round((ev.cupo_ocupado / ev.cupo_total) * 100) : 0;
         const fecha = ev.fecha ? new Date(ev.fecha.replace(" ", "T")).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }) : "—";
         return `
@@ -162,13 +172,73 @@ Sesion.requerirOrganizador();
             <td class="table-actions">
               <a class="btn btn-outline btn-sm" href="conferencistas.html?evento_id=${ev.id}">Conferencistas</a>
               <a class="btn btn-outline btn-sm" href="inscripcion.html?evento_id=${ev.id}">Inscribir</a>
+              <button class="btn btn-outline btn-sm btn-editar-evento" data-id="${ev.id}">Editar</button>
+              <button class="btn btn-outline btn-sm btn-eliminar-evento" data-id="${ev.id}" style="color:var(--color-danger); border-color:var(--color-danger);">Eliminar</button>
             </td>
           </tr>`;
       }).join("");
-
-      tablaEventos.innerHTML = filas;
     } catch (err) {
       tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">${err.message}</td></tr>`;
+    }
+  }
+
+  tablaEventos.addEventListener("click", (evento) => {
+    const btnEditar = evento.target.closest(".btn-editar-evento");
+    const btnEliminar = evento.target.closest(".btn-eliminar-evento");
+    if (btnEditar) iniciarEdicion(btnEditar.dataset.id);
+    if (btnEliminar) eliminarEvento(btnEliminar.dataset.id);
+  });
+
+  function iniciarEdicion(id) {
+    const ev = eventosCache.find((e) => String(e.id) === String(id));
+    if (!ev) return;
+    modoEdicion = true;
+
+    eventoIdEditar.value = ev.id;
+    document.getElementById("nombre").value = ev.nombre || "";
+    document.getElementById("descripcion").value = ev.descripcion || "";
+    document.getElementById("cupo_total").value = ev.cupo_total ?? "";
+    document.getElementById("fecha").value = ev.fecha ? ev.fecha.replace(" ", "T").slice(0, 16) : "";
+
+    tituloFormEvento.textContent = "Editar evento";
+    btnCrearEvento.textContent = "Guardar cambios";
+    cancelarEdicionEventoLink.style.display = "inline";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  cancelarEdicionEventoLink.addEventListener("click", (evento) => {
+    evento.preventDefault();
+    cancelarEdicion();
+  });
+
+  function cancelarEdicion() {
+    modoEdicion = false;
+    formEvento.reset();
+    eventoIdEditar.value = "";
+    tituloFormEvento.textContent = "Nuevo evento";
+    btnCrearEvento.textContent = "Crear evento";
+    cancelarEdicionEventoLink.style.display = "none";
+  }
+
+  async function eliminarEvento(id) {
+    const ev = eventosCache.find((e) => String(e.id) === String(id));
+    const confirmado = await confirmarAccion(
+      `¿Seguro que deseas eliminar el evento "${ev ? ev.nombre : id}"? También se eliminarán sus conferencistas e inscripciones.`,
+      "Sí, eliminar"
+    );
+    if (!confirmado) return;
+
+    try {
+      const resultado = await EventosAPI.eliminar(id);
+      if (resultado.status === "success") {
+        mostrarToast(resultado.mensaje, "success");
+        if (modoEdicion && eventoIdEditar.value == id) cancelarEdicion();
+        cargarEventos();
+      } else {
+        throw new Error(resultado.mensaje || "No se pudo eliminar el evento");
+      }
+    } catch (err) {
+      mostrarToast(err.message, "error");
     }
   }
 

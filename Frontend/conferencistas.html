@@ -1,12 +1,3 @@
-<!-- =========================================================================
-     conferencistas.html
-     Pertenece a: Integrante 3 - Frontend
-     Proyecto: Plataforma de Gestión de Eventos y Acreditaciones (Grupo 6)
-
-     Usa ConferencistasAPI (api.js). El backend de conferencistas aún no
-     existe (ver TODO backend en api.js) — esta pantalla queda lista para
-     conectarse en cuanto Integrante 2 publique las rutas.
-     ========================================================================= -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -47,11 +38,14 @@
   </div>
 
   <div class="grid-2">
-    <!-- Formulario: nuevo conferencista -->
     <div class="card">
-      <div class="card-title"><h3>Nuevo conferencista</h3></div>
+      <div class="card-title">
+        <h3 id="tituloFormConferencista">Nuevo conferencista</h3>
+        <a href="#" id="cancelarEdicionConferencista" class="hint" style="display:none;">Cancelar edición</a>
+      </div>
       <div class="form-error" id="errorConferencista"></div>
       <form id="formConferencista">
+        <input type="hidden" id="conferencista_id_editar" value="">
         <div class="field">
           <label for="nombre">Nombre completo</label>
           <input type="text" id="nombre" placeholder="Dra. Elena Ruiz" required>
@@ -68,7 +62,6 @@
       </form>
     </div>
 
-    <!-- Tabla: conferencistas del evento seleccionado -->
     <div class="card">
       <div class="card-title">
         <h3>Conferencistas del evento</h3>
@@ -76,10 +69,10 @@
       </div>
       <table>
         <thead>
-          <tr><th>Nombre</th><th>Contacto</th><th>Bio</th></tr>
+          <tr><th>Nombre</th><th>Contacto</th><th>Bio</th><th></th></tr>
         </thead>
         <tbody id="tablaConferencistas">
-          <tr><td colspan="3" class="empty-state">Selecciona un evento para ver sus conferencistas.</td></tr>
+          <tr><td colspan="4" class="empty-state">Selecciona un evento para ver sus conferencistas.</td></tr>
         </tbody>
       </table>
     </div>
@@ -96,9 +89,15 @@
   const formConferencista = document.getElementById("formConferencista");
   const errorConferencista = document.getElementById("errorConferencista");
   const btnCrearConferencista = document.getElementById("btnCrearConferencista");
+  const tituloFormConferencista = document.getElementById("tituloFormConferencista");
+  const cancelarEdicionConfLink = document.getElementById("cancelarEdicionConferencista");
+  const conferencistaIdEditar = document.getElementById("conferencista_id_editar");
 
   const parametros = new URLSearchParams(window.location.search);
   const eventoPreseleccionado = parametros.get("evento_id");
+
+  let conferencistasCache = [];
+  let modoEdicionConf = false;
 
   async function cargarSelectorEventos() {
     try {
@@ -113,7 +112,7 @@
     }
   }
 
-  selectorEvento.addEventListener("change", cargarConferencistas);
+  selectorEvento.addEventListener("change", () => { cancelarEdicionConf(); cargarConferencistas(); });
 
   formConferencista.addEventListener("submit", async (evento) => {
     evento.preventDefault();
@@ -127,28 +126,36 @@
     }
 
     btnCrearConferencista.disabled = true;
-    btnCrearConferencista.textContent = "Agregando…";
+    btnCrearConferencista.textContent = modoEdicionConf ? "Guardando…" : "Agregando…";
+
+    const payload = {
+      nombre: document.getElementById("nombre").value.trim(),
+      email: document.getElementById("email").value.trim(),
+      bio: document.getElementById("bio").value.trim(),
+      evento_id,
+    };
 
     try {
-      const resultado = await ConferencistasAPI.crear({
-        nombre: document.getElementById("nombre").value.trim(),
-        email: document.getElementById("email").value.trim(),
-        bio: document.getElementById("bio").value.trim(),
-        evento_id,
-      });
+      let resultado;
+      if (modoEdicionConf) {
+        payload.id = parseInt(conferencistaIdEditar.value, 10);
+        resultado = await ConferencistasAPI.editar(payload);
+      } else {
+        resultado = await ConferencistasAPI.crear(payload);
+      }
       if (resultado.status === "ok" || resultado.id) {
-        mostrarToast("Conferencista agregado", "success");
-        formConferencista.reset();
+        mostrarToast(modoEdicionConf ? "Conferencista actualizado" : "Conferencista agregado", "success");
+        cancelarEdicionConf();
         cargarConferencistas();
       } else {
-        throw new Error(resultado.mensaje || "No se pudo agregar el conferencista");
+        throw new Error(resultado.mensaje || "No se pudo guardar el conferencista");
       }
     } catch (err) {
       errorConferencista.textContent = err.message;
       errorConferencista.classList.add("visible");
     } finally {
       btnCrearConferencista.disabled = false;
-      btnCrearConferencista.textContent = "Agregar conferencista";
+      btnCrearConferencista.textContent = modoEdicionConf ? "Guardar cambios" : "Agregar conferencista";
     }
   });
 
@@ -156,11 +163,12 @@
     const evento_id = selectorEvento.value;
     if (!evento_id) return;
 
-    tablaConferencistas.innerHTML = `<tr><td colspan="3" class="empty-state">Cargando…</td></tr>`;
+    tablaConferencistas.innerHTML = `<tr><td colspan="4" class="empty-state">Cargando…</td></tr>`;
     try {
       const conferencistas = await ConferencistasAPI.listarPorEvento(evento_id);
+      conferencistasCache = conferencistas;
       if (!conferencistas || conferencistas.length === 0) {
-        tablaConferencistas.innerHTML = `<tr><td colspan="3" class="empty-state">Este evento aún no tiene conferencistas.</td></tr>`;
+        tablaConferencistas.innerHTML = `<tr><td colspan="4" class="empty-state">Este evento aún no tiene conferencistas.</td></tr>`;
         return;
       }
       tablaConferencistas.innerHTML = conferencistas.map((c) => `
@@ -168,9 +176,70 @@
           <td style="font-weight:600;">${escaparHTML(c.nombre)}</td>
           <td>${escaparHTML(c.email || "—")}</td>
           <td class="hint">${escaparHTML(c.bio || "—")}</td>
+          <td class="table-actions">
+            <button class="btn btn-outline btn-sm btn-editar-conf" data-id="${c.id}">Editar</button>
+            <button class="btn btn-outline btn-sm btn-eliminar-conf" data-id="${c.id}" style="color:var(--color-danger); border-color:var(--color-danger);">Eliminar</button>
+          </td>
         </tr>`).join("");
     } catch (err) {
-      tablaConferencistas.innerHTML = `<tr><td colspan="3" class="empty-state">${err.message}<br><span class="hint">(Pendiente: endpoint /conferencistas/listar en el backend)</span></td></tr>`;
+      tablaConferencistas.innerHTML = `<tr><td colspan="4" class="empty-state">${err.message}</td></tr>`;
+    }
+  }
+
+  tablaConferencistas.addEventListener("click", (evento) => {
+    const btnEditar = evento.target.closest(".btn-editar-conf");
+    const btnEliminar = evento.target.closest(".btn-eliminar-conf");
+    if (btnEditar) iniciarEdicionConf(btnEditar.dataset.id);
+    if (btnEliminar) eliminarConferencista(btnEliminar.dataset.id);
+  });
+
+  function iniciarEdicionConf(id) {
+    const c = conferencistasCache.find((x) => String(x.id) === String(id));
+    if (!c) return;
+    modoEdicionConf = true;
+    conferencistaIdEditar.value = c.id;
+    document.getElementById("nombre").value = c.nombre || "";
+    document.getElementById("email").value = c.email || "";
+    document.getElementById("bio").value = c.bio || "";
+    tituloFormConferencista.textContent = "Editar conferencista";
+    btnCrearConferencista.textContent = "Guardar cambios";
+    cancelarEdicionConfLink.style.display = "inline";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  cancelarEdicionConfLink.addEventListener("click", (evento) => {
+    evento.preventDefault();
+    cancelarEdicionConf();
+  });
+
+  function cancelarEdicionConf() {
+    modoEdicionConf = false;
+    formConferencista.reset();
+    conferencistaIdEditar.value = "";
+    tituloFormConferencista.textContent = "Nuevo conferencista";
+    btnCrearConferencista.textContent = "Agregar conferencista";
+    cancelarEdicionConfLink.style.display = "none";
+  }
+
+  async function eliminarConferencista(id) {
+    const c = conferencistasCache.find((x) => String(x.id) === String(id));
+    const confirmado = await confirmarAccion(
+      `¿Seguro que deseas eliminar a "${c ? c.nombre : id}" de la lista de conferencistas?`,
+      "Sí, eliminar"
+    );
+    if (!confirmado) return;
+
+    try {
+      const resultado = await ConferencistasAPI.eliminar(id);
+      if (resultado.status === "success") {
+        mostrarToast(resultado.mensaje, "success");
+        if (modoEdicionConf && conferencistaIdEditar.value == id) cancelarEdicionConf();
+        cargarConferencistas();
+      } else {
+        throw new Error(resultado.mensaje || "No se pudo eliminar el conferencista");
+      }
+    } catch (err) {
+      mostrarToast(err.message, "error");
     }
   }
 

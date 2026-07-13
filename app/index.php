@@ -1,4 +1,10 @@
 <?php
+// Nunca mostrar warnings/notices en el cuerpo de la respuesta: rompen el JSON
+// que espera el frontend. Se siguen registrando en el log de PHP para depurar.
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 session_start();
 header("Content-Type: application/json");
 require_once __DIR__ . '/../config/database.php';
@@ -22,14 +28,29 @@ switch ("$recurso:$method:$action") {
     case "eventos:POST:crear":
         (new EventoController())->crear();
         break;
+    case "eventos:POST:editar":
+        (new EventoController())->editar();
+        break;
+    case "eventos:POST:eliminar":
+        (new EventoController())->eliminar();
+        break;
     case "eventos:POST:inscribir":
         (new EventoController())->inscribir();
+        break;
+    case "eventos:POST:cancelar":
+        (new EventoController())->cancelar();
         break;
     case "eventos:GET:ocupacion":
         (new EventoController())->ocupacion();
         break;
     case "eventos:GET:listar":
         (new EventoController())->listar();
+        break;
+    case "eventos:GET:inscripciones":
+        (new EventoController())->listarInscripciones();
+        break;
+    case "eventos:GET:misinscripciones":
+        (new EventoController())->misInscripciones();
         break;
     case "eventos:POST:asistencia":
         (new EventoController())->asistencia();
@@ -45,6 +66,12 @@ switch ("$recurso:$method:$action") {
         break;
     case "conferencistas:POST:crear":
         (new ConferencistaController())->crear();
+        break;
+    case "conferencistas:POST:editar":
+        (new ConferencistaController())->editar();
+        break;
+    case "conferencistas:POST:eliminar":
+        (new ConferencistaController())->eliminar();
         break;
     case "conferencistas:GET:listar":
         (new ConferencistaController())->listar();

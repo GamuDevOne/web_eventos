@@ -1,13 +1,3 @@
-<!-- =========================================================================
-     participante.html
-     Pertenece a: Integrante 3 - Frontend
-     Proyecto: Plataforma de Gestión de Eventos y Acreditaciones (Grupo 6)
-
-     Vista exclusiva para usuarios con rol "participante": ver eventos
-     disponibles, inscribirse, y ver sus inscripciones (guardadas en el
-     navegador porque el backend aún no tiene endpoint para listarlas
-     por usuario — ver TODO backend en api.js).
-     ========================================================================= -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -36,12 +26,11 @@
     <div>
       <div class="eyebrow">Participante</div>
       <h1>Eventos disponibles</h1>
-      <p>Inscríbete a los eventos que te interesen y revisa tu cupo.</p>
+      <p>Inscríbete a los eventos que te interesen y revisa tu cupo. Tu código: <span class="codigo-tag" id="miCodigo">—</span></p>
     </div>
   </div>
 
   <div class="grid-2">
-    <!-- Listado de eventos con opción de inscribirse -->
     <div class="card">
       <div class="card-title">
         <h3>Próximos eventos</h3>
@@ -57,12 +46,10 @@
       </table>
     </div>
 
-    <!-- Mis inscripciones (registro local, ver nota TODO backend) -->
     <div class="card card-credential">
       <div class="card-title"><h3>Mis inscripciones</h3></div>
       <p class="hint">
-        Este listado se guarda en tu navegador mientras el backend no tenga
-        un endpoint para consultar tus inscripciones por usuario.
+        Puedes cancelar una inscripción hasta 4 dias antes del evento.
       </p>
       <div id="listaMisInscripciones"></div>
     </div>
@@ -73,15 +60,26 @@
 <script>
   const usuarioActual = Sesion.requerirParticipante();
   pintarUsuarioNavbar();
+  const miCodigoEl = document.getElementById("miCodigo");
+  if (usuarioActual && usuarioActual.codigo) miCodigoEl.textContent = usuarioActual.codigo;
 
   const tablaEventos = document.getElementById("tablaEventos");
   const listaMisInscripciones = document.getElementById("listaMisInscripciones");
-  const CLAVE_LOCAL = `mis_inscripciones_${usuarioActual ? usuarioActual.id : "anon"}`;
+let misInscripcionesCache = [];
 
   function claseCupo(porcentaje) {
     if (porcentaje >= 100) return "lleno";
     if (porcentaje >= 75) return "alto";
     return "";
+  }
+
+  function estadoInscripcionEvento(ev) {
+    if (!ev.fecha) return { permitido: true };
+    const fechaEvento = new Date(ev.fecha.replace(" ", "T"));
+    const horasRestantes = (fechaEvento.getTime() - Date.now()) / 36e5;
+    if (horasRestantes < 0) return { permitido: false, texto: "Evento finalizado" };
+    if (horasRestantes < 48) return { permitido: false, texto: "Inscripciones cerradas" };
+    return { permitido: true };
   }
 
   async function cargarEventos() {
@@ -96,6 +94,9 @@
       tablaEventos.innerHTML = eventos.map((ev) => {
         const porcentaje = ev.cupo_total > 0 ? Math.round((ev.cupo_ocupado / ev.cupo_total) * 100) : 0;
         const lleno = porcentaje >= 100;
+        const estado = estadoInscripcionEvento(ev);
+        const deshabilitado = lleno || !estado.permitido;
+        const textoBoton = lleno ? "Cupo lleno" : (!estado.permitido ? estado.texto : "Inscribirme");
         const fecha = ev.fecha ? new Date(ev.fecha.replace(" ", "T")).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }) : "—";
         return `
           <tr>
@@ -106,8 +107,8 @@
               <div class="hint">${ev.cupo_ocupado}/${ev.cupo_total}</div>
             </td>
             <td>
-              <button class="btn btn-primary btn-sm" ${lleno ? "disabled" : ""} onclick="inscribirme(${ev.id}, '${escaparHTML(ev.nombre)}')">
-                ${lleno ? "Cupo lleno" : "Inscribirme"}
+              <button class="btn btn-primary btn-sm btn-inscribirme" data-id="${ev.id}" data-nombre="${escaparHTML(ev.nombre)}" ${deshabilitado ? "disabled" : ""}>
+                ${textoBoton}
               </button>
             </td>
           </tr>`;
@@ -117,13 +118,21 @@
     }
   }
 
+  tablaEventos.addEventListener("click", (evento) => {
+    const btn = evento.target.closest(".btn-inscribirme");
+    if (btn) inscribirme(btn.dataset.id, btn.dataset.nombre);
+  });
+
   async function inscribirme(evento_id, nombreEvento) {
+    const confirmado = await confirmarAccion(`¿Confirmas tu inscripción a "${nombreEvento}"?`, "Sí, inscribirme");
+    if (!confirmado) return;
+
     try {
       const resultado = await EventosAPI.inscribir(evento_id, usuarioActual.id);
       if (resultado.status === "success") {
         mostrarToast(resultado.mensaje, "success");
-        guardarInscripcionLocal(nombreEvento);
         cargarEventos();
+        cargarMisInscripciones();
       } else {
         mostrarToast(resultado.mensaje || "No se pudo completar la inscripción", "error");
       }
@@ -132,25 +141,89 @@
     }
   }
 
-  function guardarInscripcionLocal(nombreEvento) {
-    const registro = JSON.parse(localStorage.getItem(CLAVE_LOCAL) || "[]");
-    registro.push({ evento: nombreEvento, fecha: new Date().toLocaleString("es-ES") });
-    localStorage.setItem(CLAVE_LOCAL, JSON.stringify(registro));
-    pintarMisInscripciones();
+  function horasParaEvento(fecha) {
+    if (!fecha) return Infinity;
+    return (new Date(fecha.replace(" ", "T")).getTime() - Date.now()) / 36e5;
   }
 
-  function pintarMisInscripciones() {
-    const registro = JSON.parse(localStorage.getItem(CLAVE_LOCAL) || "[]");
-    if (registro.length === 0) {
-      listaMisInscripciones.innerHTML = `<div class="empty-state">Aún no te has inscrito a ningún evento.</div>`;
-      return;
+  async function cargarMisInscripciones() {
+    listaMisInscripciones.innerHTML = `<div class="empty-state">Cargando…</div>`;
+    try {
+      const inscripciones = await EventosAPI.misInscripciones();
+      misInscripcionesCache = inscripciones;
+      if (!inscripciones || inscripciones.length === 0) {
+        listaMisInscripciones.innerHTML = `<div class="empty-state">Aún no te has inscrito a ningún evento.</div>`;
+        return;
+      }
+
+  listaMisInscripciones.innerHTML = inscripciones.map((insc) => {
+        const horas = horasParaEvento(insc.evento_fecha);
+        const puedeCancelar = horas >= 48;
+        const fecha = insc.evento_fecha ? new Date(insc.evento_fecha.replace(" ", "T")).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }) : "—";
+        const estadoTexto = horas < 0 ? "Evento finalizado" : (insc.presente ? "Asististe" : "Confirmada");
+        const botonAcreditacion = insc.codigo_unico
+          ? `<button class="btn btn-accent btn-sm btn-ver-mi-acreditacion" data-id="${insc.inscripcion_id}">★ Ver acreditación</button>`
+          : "";
+
+        return `
+          <div style="padding:10px 0; border-bottom:1px solid var(--color-border);">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <div>
+                <div style="font-weight:600;">${escaparHTML(insc.evento_nombre)}</div>
+                <div class="hint">${fecha} · ${estadoTexto}</div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                ${botonAcreditacion}
+                <button class="btn btn-outline btn-sm btn-cancelar-mi-insc" data-id="${insc.inscripcion_id}" data-nombre="${escaparHTML(insc.evento_nombre)}"
+                  style="color:var(--color-danger); border-color:var(--color-danger);" ${puedeCancelar ? "" : "disabled title=\"Solo se puede cancelar hasta 48h antes del evento\""}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    } catch (err) {
+      listaMisInscripciones.innerHTML = `<div class="empty-state">${err.message}</div>`;
     }
-    listaMisInscripciones.innerHTML = registro.map((r) => `
-      <div style="padding:10px 0; border-bottom:1px solid var(--color-border);">
-        <div style="font-weight:600;">${escaparHTML(r.evento)}</div>
-        <div class="hint">Inscrito el ${r.fecha}</div>
-      </div>
-    `).join("");
+  }
+
+listaMisInscripciones.addEventListener("click", (evento) => {
+    const btnCancelar = evento.target.closest(".btn-cancelar-mi-insc");
+    const btnVer = evento.target.closest(".btn-ver-mi-acreditacion");
+    if (btnCancelar) cancelarMiInscripcion(btnCancelar.dataset.id, btnCancelar.dataset.nombre);
+    if (btnVer) verMiAcreditacion(btnVer.dataset.id);
+  });
+
+  function verMiAcreditacion(inscripcionId) {
+    const insc = misInscripcionesCache.find((i) => String(i.inscripcion_id) === String(inscripcionId));
+    if (!insc) return;
+    mostrarAcreditacionDigital({
+      participanteNombre: usuarioActual.nombre,
+      participanteCodigo: usuarioActual.codigo,
+      eventoNombre: insc.evento_nombre,
+      eventoFecha: insc.evento_fecha,
+      codigoUnico: insc.codigo_unico,
+      fechaEmision: insc.acreditacion_fecha_emision,
+    });
+  }
+
+  async function cancelarMiInscripcion(inscripcion_id, nombreEvento) {
+    const confirmado = await confirmarAccion(`¿Cancelar tu inscripción a "${nombreEvento}"?`, "Sí, cancelar");
+    if (!confirmado) return;
+
+    try {
+      const resultado = await EventosAPI.cancelarInscripcion(inscripcion_id);
+      if (resultado.status === "success") {
+        mostrarToast(resultado.mensaje, "success");
+        cargarMisInscripciones();
+        cargarEventos();
+      } else {
+        throw new Error(resultado.mensaje || "No se pudo cancelar la inscripción");
+      }
+    } catch (err) {
+      mostrarToast(err.message, "error");
+    }
   }
 
   function escaparHTML(texto) {
@@ -160,7 +233,7 @@
   }
 
   cargarEventos();
-  pintarMisInscripciones();
+  cargarMisInscripciones();
 </script>
 </body>
 </html>
