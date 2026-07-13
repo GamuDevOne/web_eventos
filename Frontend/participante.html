@@ -36,11 +36,11 @@
         <h3>Próximos eventos</h3>
         <button class="btn btn-outline btn-sm" onclick="cargarEventos()">Actualizar</button>
       </div>
-      <table>
+      <table id="tablaEventos">
         <thead>
           <tr><th>Evento</th><th>Fecha</th><th>Cupo</th><th></th></tr>
         </thead>
-        <tbody id="tablaEventos">
+        <tbody>
           <tr><td colspan="4" class="empty-state">Cargando eventos…</td></tr>
         </tbody>
       </table>
@@ -83,40 +83,40 @@ let misInscripcionesCache = [];
   }
 
   async function cargarEventos() {
-    tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">Cargando eventos…</td></tr>`;
-    try {
-      const eventos = await EventosAPI.listar();
-      if (!eventos || eventos.length === 0) {
-        tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">No hay eventos disponibles todavía.</td></tr>`;
-        return;
-      }
-
-      tablaEventos.innerHTML = eventos.map((ev) => {
-        const porcentaje = ev.cupo_total > 0 ? Math.round((ev.cupo_ocupado / ev.cupo_total) * 100) : 0;
-        const lleno = porcentaje >= 100;
-        const estado = estadoInscripcionEvento(ev);
-        const deshabilitado = lleno || !estado.permitido;
-        const textoBoton = lleno ? "Cupo lleno" : (!estado.permitido ? estado.texto : "Inscribirme");
-        const fecha = ev.fecha ? new Date(ev.fecha.replace(" ", "T")).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }) : "—";
-        return `
-          <tr>
-            <td style="font-weight:600;">${escaparHTML(ev.nombre)}</td>
-            <td>${fecha}</td>
-            <td style="min-width:120px;">
-              <div class="cupo-bar"><div class="cupo-bar-fill ${claseCupo(porcentaje)}" style="width:${Math.min(porcentaje,100)}%"></div></div>
-              <div class="hint">${ev.cupo_ocupado}/${ev.cupo_total}</div>
-            </td>
-            <td>
-              <button class="btn btn-primary btn-sm btn-inscribirme" data-id="${ev.id}" data-nombre="${escaparHTML(ev.nombre)}" ${deshabilitado ? "disabled" : ""}>
-                ${textoBoton}
-              </button>
-            </td>
-          </tr>`;
-      }).join("");
-    } catch (err) {
-      tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">${err.message}</td></tr>`;
+  tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">Cargando eventos…</td></tr>`;
+  try {
+    const eventos = await EventosAPI.listar();
+    if (!eventos || eventos.length === 0) {
+      tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">No hay eventos disponibles todavía.</td></tr>`;
+      return;
     }
+
+    tablaEventos.innerHTML = eventos.map((ev) => {
+      const porcentaje = ev.cupo_total > 0 ? Math.round((ev.cupo_ocupado / ev.cupo_total) * 100) : 0;
+      const lleno = porcentaje >= 100;
+      const estado = estadoInscripcionEvento(ev);
+      const deshabilitado = lleno || !estado.permitido;
+      const textoBoton = lleno ? "Cupo lleno" : (!estado.permitido ? estado.texto : "Inscribirme");
+      const fecha = ev.fecha ? new Date(ev.fecha.replace(" ", "T")).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" }) : "—";
+      return `
+        <tr>
+          <td data-label="Evento" style="font-weight:600;">${escaparHTML(ev.nombre)}</td>
+          <td data-label="Fecha">${fecha}</td>
+          <td data-label="Cupo" style="min-width:120px;">
+            <div class="cupo-bar"><div class="cupo-bar-fill ${claseCupo(porcentaje)}" style="width:${Math.min(porcentaje,100)}%"></div></div>
+            <div class="hint">${ev.cupo_ocupado}/${ev.cupo_total}</div>
+          </td>
+          <td data-label="">
+            <button class="btn btn-primary btn-sm btn-inscribirme" data-id="${ev.id}" data-nombre="${escaparHTML(ev.nombre)}" ${deshabilitado ? "disabled" : ""}>
+              ${textoBoton}
+            </button>
+          </td>
+        </tr>`;
+    }).join("");
+  } catch (err) {
+    tablaEventos.innerHTML = `<tr><td colspan="4" class="empty-state">${err.message}</td></tr>`;
   }
+}
 
   tablaEventos.addEventListener("click", (evento) => {
     const btn = evento.target.closest(".btn-inscribirme");
