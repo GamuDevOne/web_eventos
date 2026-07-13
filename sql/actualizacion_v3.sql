@@ -41,7 +41,37 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- ========================================================
--- 2. Procedimientos almacenados (versión final consolidada)
+-- 2. CORRECCIÓN: llave única en asistencia.inscripcion_id
+--    Sin esto, el ON DUPLICATE KEY UPDATE de
+--    sp_registrar_asistencia nunca detecta duplicados y cada
+--    registro repetido crea una fila nueva en vez de actualizar
+--    la existente (rompe el conteo real de asistencia).
+-- ========================================================
+
+-- 2.1 Limpia duplicados que ya se hayan generado por el bug,
+--     dejando solo el registro más reciente por inscripcion_id.
+DELETE a1 FROM asistencia a1
+INNER JOIN asistencia a2
+  ON a1.inscripcion_id = a2.inscripcion_id
+  AND (a1.fecha_asistencia < a2.fecha_asistencia
+       OR (a1.fecha_asistencia = a2.fecha_asistencia AND a1.id < a2.id));
+
+-- 2.2 Agrega la llave única (solo si no existe todavía)
+SET @llaveAsistenciaExiste = (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asistencia' AND INDEX_NAME = 'unique_asistencia_inscripcion'
+);
+
+SET @sql = IF(@llaveAsistenciaExiste = 0,
+  'ALTER TABLE asistencia ADD UNIQUE KEY unique_asistencia_inscripcion (inscripcion_id)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ========================================================
+-- 3. Procedimientos almacenados (versión final consolidada)
 --    Acreditación 100% digital: url_descarga ya no se usa (queda NULL).
 -- ========================================================
 DELIMITER $$
@@ -233,8 +263,6 @@ BEGIN
     SELECT 'success' AS status, 'Asistencia registrada' AS mensaje;
 END$$
 
--- Acreditación 100% DIGITAL: sin generación ni almacenamiento de PDF.
--- url_descarga se conserva en la tabla por compatibilidad pero ya no se usa (queda NULL).
 DROP PROCEDURE IF EXISTS `sp_generar_acreditacion`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_generar_acreditacion` (IN `p_inscripcion_id` INT, IN `p_codigo_unico` VARCHAR(50), IN `p_url` VARCHAR(255))
 BEGIN
@@ -266,7 +294,6 @@ BEGIN
     END IF;
 END$$
 
--- Incluye acreditacion_fecha_emision para poder mostrar la credencial digital
 DROP PROCEDURE IF EXISTS `sp_listar_inscripciones_por_evento`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_listar_inscripciones_por_evento` (IN p_evento_id INT)
 BEGIN
@@ -295,7 +322,6 @@ BEGIN
     ORDER BY u.nombre ASC;
 END$$
 
--- Incluye acreditacion_fecha_emision para poder mostrar la credencial digital
 DROP PROCEDURE IF EXISTS `sp_listar_inscripciones_por_usuario`$$
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_listar_inscripciones_por_usuario` (IN p_usuario_id INT)
 BEGIN
